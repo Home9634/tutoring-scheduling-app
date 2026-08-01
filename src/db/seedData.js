@@ -6,25 +6,22 @@ export const SEED_DATA = {
     // { id: "student_bob", name: "Bob Tan", status: "active" }
   ],
   schedules: [
-    { 
-      id: "sched_alice", 
-      student_id: "student_alice", 
-      day_of_week: 0, // Sunday
-      start_time: "15:30", 
-      end_time: "16:30" 
-    },
-    { 
-      id: "sched_bob", 
-      student_id: "student_bob", 
-      day_of_week: 2, // Tuesday
-      start_time: "16:00", 
-      end_time: "17:00" 
-    }
+    // { 
+    //   id: "sched_alice", 
+    //   student_id: "student_alice", 
+    //   day_of_week: 0, // Sunday
+    //   start_time: "15:30", 
+    //   end_time: "16:30" 
+    // },
+    // { 
+    //   id: "sched_bob", 
+    //   student_id: "student_bob", 
+    //   day_of_week: 2, // Tuesday
+    //   start_time: "16:00", 
+    //   end_time: "17:00" 
+    // }
   ],
   classes: [
-    {
-        "id": "class_alice_jun"
-    }
     // --- Alice's Classes ---
     // Completed class
     // {

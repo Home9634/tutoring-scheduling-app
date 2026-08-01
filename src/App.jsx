@@ -23,6 +23,8 @@ export default function App() {
   // Modal Control States
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [makeupParentClass, setMakeupParentClass] = useState(null);
+  const [editingClass, setEditingClass] = useState(null);
+
 
   useEffect(() => {
     refreshData();
@@ -75,6 +77,11 @@ export default function App() {
     setIsClassModalOpen(true);
   };
 
+  const handleInitiateEditClass = (classObj) => {
+    setEditingClass(classObj);
+    setIsClassModalOpen(true);
+  };
+  
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-slate-900 text-gray-900 dark:text-slate-100 pb-32 transition-colors duration-200">
       {/* Navbar */}
@@ -226,6 +233,7 @@ export default function App() {
         onScheduleMakeup={handleInitiateMakeup}
         onDeleteClass={handleDeleteClass}
         onAddCustomClass={handleInitiateCustomClass}
+        onEditClass={handleInitiateEditClass}
       />
 
       {/* Schedule Makeup Dialog Modal */}
@@ -234,12 +242,14 @@ export default function App() {
         onClose={() => {
           setIsClassModalOpen(false);
           setMakeupParentClass(null);
+          setEditingClass(null);
         }}
         parentClass={makeupParentClass}
         existingMakeupClass={classes.find(c => c.linked_to_missed_class_id === makeupParentClass?.id)}
         students={students}
         onSave={refreshData}
         selectedDate={selectedDate}
+        editingClass={editingClass}
       />
     </div>
   );

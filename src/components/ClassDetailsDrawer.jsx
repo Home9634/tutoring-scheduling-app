@@ -11,11 +11,14 @@ export default function ClassDetailsDrawer({
   onUpdateStatus,
   onScheduleMakeup,
   onDeleteClass,
-  onAddCustomClass
+  onAddCustomClass,
+  onEditClass
 }) {
   if (!selectedDate) return null;
 
-  const todaysClasses = classes.filter(c => c.scheduled_at.startsWith(selectedDate));
+  const todaysClasses = classes
+    .filter(c => c.scheduled_at.startsWith(selectedDate))
+    .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at));
 
   const displayDate = new Date(selectedDate).toLocaleDateString('en-GB', {
     weekday: 'long',
@@ -124,12 +127,15 @@ export default function ClassDetailsDrawer({
                   <div className="flex flex-wrap gap-2">
                     {/* Done Action */}
                     {c.status === 'Scheduled' && (
-                      <button
-                        onClick={() => onUpdateStatus(c.id, 'Completed')}
-                        className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded shadow transition cursor-pointer"
-                      >
-                        ✓ Done
-                      </button>
+                      <>
+                        <button
+                          onClick={() => onUpdateStatus(c.id, 'Completed')}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded shadow transition"
+                        >
+                          ✓ Done
+                        </button>
+                        {/* Edit Button for any Scheduled class */}
+                      </>
                     )}
 
                     {/* Action routes for Normal classes */}
@@ -146,6 +152,12 @@ export default function ClassDetailsDrawer({
                           className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold rounded shadow transition cursor-pointer"
                         >
                           ✕ Parent Cancel
+                        </button>
+                        <button
+                          onClick={() => onEditClass(c)}
+                          className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-gray-300 dark:hover:bg-slate-600 text-gray-800 dark:text-slate-100 text-xs font-bold rounded shadow transition cursor-pointer"
+                        >
+                          ✏️ Edit
                         </button>
                       </>
                     )}

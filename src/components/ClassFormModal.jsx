@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { dbService } from '../db/dbService';
 import { formatForDateTimeInput } from '../utils/dateHelpers';
 
-export default function ClassFormModal({ isOpen, onClose, parentClass, existingMakeupClass, students, selectedDate, onSave }) {
+export default function ClassFormModal({ isOpen, onClose, parentClass, existingMakeupClass, editingClass, students, selectedDate, onSave }) {
   const [scheduledAt, setScheduledAt] = useState('');
   const [studentId, setStudentId] = useState('');
 
@@ -12,7 +12,11 @@ export default function ClassFormModal({ isOpen, onClose, parentClass, existingM
   // Handle pre-filling states depending on whether we are in Makeup Mode or General Mode
   useEffect(() => {
     if (isOpen) {
-      if (parentClass) {
+      if (editingClass) {
+        // Mode C: Editing an existing class
+        setStudentId(editingClass.student_id);
+        setScheduledAt(formatForDateTimeInput(editingClass.scheduled_at));
+      } else if (parentClass) {
         // Mode A: Makeup / Rescheduling
         setStudentId(parentClass.student_id);
         if (existingMakeupClass) {
@@ -31,7 +35,10 @@ export default function ClassFormModal({ isOpen, onClose, parentClass, existingM
   if (!isOpen) return null;
 
   const isMakeupMode = parentClass !== null;
+  const isEditMode = editingClass !== undefined && editingClass !== null;
   const targetStudent = students.find(s => s.id === studentId);
+  const disableStudentSelect = isMakeupMode || (isEditMode && editingClass.linked_to_missed_class_id !== null);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!studentId) {
@@ -43,13 +50,18 @@ export default function ClassFormModal({ isOpen, onClose, parentClass, existingM
       return;
     }
 
-    if (isMakeupMode) {
+    if (editingClass && editingClass.id) {
+      const updatedClass = {
+        ...editingClass,
+        student_id: studentId,
+        scheduled_at: scheduledAt
+      };
+      dbService.saveClass(updatedClass);
+    } else if (parentClass && parentClass.id) {
       if (existingMakeupClass) {
-        // Rescheduling existing makeup
         const updatedMakeup = { ...existingMakeupClass, scheduled_at: scheduledAt };
         dbService.saveClass(updatedMakeup);
       } else {
-        // Creating a new linked makeup
         const newMakeup = {
           student_id: studentId,
           scheduled_at: scheduledAt,
@@ -59,7 +71,6 @@ export default function ClassFormModal({ isOpen, onClose, parentClass, existingM
         dbService.saveClass(newMakeup);
       }
     } else {
-      // General custom class creation
       const newCustomClass = {
         student_id: studentId,
         scheduled_at: scheduledAt,
@@ -79,10 +90,7 @@ export default function ClassFormModal({ isOpen, onClose, parentClass, existingM
         {/* Header */}
         <div className="px-6 py-4 bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600 flex justify-between items-center">
           <h3 className="text-lg font-bold text-gray-800 dark:text-slate-100">
-            {isMakeupMode
-              ? (existingMakeupClass ? 'Reschedule Makeup Class' : 'Schedule Makeup Class')
-              : 'Create Class'
-            }
+            {isEditMode ? 'Edit Class Details' : (isMakeupMode ? 'Schedule Makeup Class' : 'Create Custom Class')}
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 font-bold">✕</button>
         </div>
@@ -98,11 +106,15 @@ export default function ClassFormModal({ isOpen, onClose, parentClass, existingM
           {/* Student Selector Row */}
           <div>
             <label className="block text-xs font-bold text-gray-600 dark:text-slate-300 mb-1">Student</label>
-            {isMakeupMode ? (
-              // Read-only info in makeup mode
+            {disableStudentSelect ? (
               <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded border border-slate-200 dark:border-slate-600 text-xs text-slate-700 dark:text-slate-300 space-y-1">
                 <p><strong>Student:</strong> {targetStudent ? targetStudent.name : 'Unknown'}</p>
-                <p><strong>Missed Lesson Date:</strong> {new Date(parentClass.scheduled_at).toLocaleDateString('en-GB')}</p>
+                {isMakeupMode && (
+                  <p><strong>Missed Lesson Date:</strong> {new Date(parentClass.scheduled_at).toLocaleDateString('en-GB')}</p>
+                )}
+                {isEditMode && editingClass.linked_to_missed_class_id && (
+                  <p className="text-purple-600 dark:text-purple-400 font-semibold">🔄 Lock: This is a makeup class and must stay assigned to this student.</p>
+                )}
               </div>
             ) : (
               // Interactive dropdown in general mode
@@ -125,8 +137,8 @@ export default function ClassFormModal({ isOpen, onClose, parentClass, existingM
           {/* Date & Time Row */}
           <div>
             <label className="block text-xs font-bold text-gray-600 dark:text-slate-300 mb-1">Date & Time</label>
-            <input 
-              type="datetime-local" 
+            <input
+              type="datetime-local"
               value={scheduledAt}
               onChange={(e) => setScheduledAt(e.target.value)}
               className="w-full text-sm border-gray-300 dark:border-slate-600 rounded p-2 border bg-gray-50 dark:bg-slate-700 text-gray-950 dark:text-slate-100 focus:ring-2 focus:ring-slate-500"
@@ -136,18 +148,18 @@ export default function ClassFormModal({ isOpen, onClose, parentClass, existingM
 
           {/* Footer Action Buttons */}
           <div className="flex justify-end gap-2 pt-2">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={onClose}
               className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200"
             >
               Cancel
             </button>
-            <button 
+            <button
               type="submit"
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-bold shadow"
             >
-              {isMakeupMode ? 'Reschedule' : 'Create Class'}
+              {isEditMode ? 'Save Changes' : 'Confirm'}
             </button>
           </div>
         </form>

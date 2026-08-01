@@ -79,7 +79,7 @@ export default function CalendarView({ classes, students, onSelectDate }) {
           const dateStr = `${yyyy}-${mm}-${dd}`;
 
           // Find classes on this specific date
-          const daysClasses = classes.filter(c => c.scheduled_at.startsWith(dateStr));
+          const daysClasses = classes.filter(c => c.scheduled_at.startsWith(dateStr)) ?? [];
 
           return (
             <div
