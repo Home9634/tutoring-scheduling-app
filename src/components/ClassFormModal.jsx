@@ -4,33 +4,56 @@ import { dbService } from '../db/dbService';
 import { formatForDateTimeInput } from '../utils/dateHelpers';
 
 export default function ClassFormModal({ isOpen, onClose, parentClass, existingMakeupClass, editingClass, students, selectedDate, onSave }) {
-  const [scheduledAt, setScheduledAt] = useState('');
+  const [dateOnly, setDateOnly] = useState('');
+  const [hour, setHour] = useState('4'); // 1-12
+  const [minute, setMinute] = useState('00'); // '00', '15', '30', '45'
+  const [period, setPeriod] = useState('PM'); // AM or PM
   const [studentId, setStudentId] = useState('');
 
   const activeStudents = students.filter(s => s.status === 'active');
 
-  // Handle pre-filling states depending on whether we are in Makeup Mode or General Mode
+  // Parses YYYY-MM-DDTHH:MM into date, hours, minutes and AM/PM
+  const parseDateTime = (dateTimeStr) => {
+    if (!dateTimeStr) return;
+    const [datePart, timePart] = dateTimeStr.split('T');
+    setDateOnly(datePart);
+
+    if (timePart) {
+      const [rawH, rawM] = timePart.split(':');
+      const hNum = parseInt(rawH, 10);
+      const isPm = hNum >= 12;
+      const h12 = hNum % 12 === 0 ? 12 : hNum % 12;
+
+      setHour(String(h12));
+      setMinute(rawM.substring(0, 2));
+      setPeriod(isPm ? 'PM' : 'AM');
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       if (editingClass) {
-        // Mode C: Editing an existing class
         setStudentId(editingClass.student_id);
-        setScheduledAt(formatForDateTimeInput(editingClass.scheduled_at));
+        parseDateTime(editingClass.scheduled_at);
       } else if (parentClass) {
-        // Mode A: Makeup / Rescheduling
         setStudentId(parentClass.student_id);
         if (existingMakeupClass) {
-          setScheduledAt(formatForDateTimeInput(existingMakeupClass.scheduled_at));
+          parseDateTime(existingMakeupClass.scheduled_at);
         } else {
-          setScheduledAt('');
+          setDateOnly(selectedDate || '');
+          setHour('4');
+          setMinute('00');
+          setPeriod('PM');
         }
       } else {
-        // Mode B: General Creation
         setStudentId(activeStudents[0]?.id || '');
-        setScheduledAt(`${selectedDate}T15:00`); // Default to 3:00 PM on clicked date
+        setDateOnly(selectedDate || '');
+        setHour('4');
+        setMinute('00');
+        setPeriod('PM');
       }
     }
-  }, [parentClass, existingMakeupClass, isOpen, selectedDate]);
+  }, [parentClass, existingMakeupClass, editingClass, isOpen, selectedDate]);
 
   if (!isOpen) return null;
 
@@ -45,19 +68,25 @@ export default function ClassFormModal({ isOpen, onClose, parentClass, existingM
       alert("Please select a student.");
       return;
     }
-    if (!scheduledAt) {
-      alert("Please select a date and time.");
+    if (!dateOnly) {
+      alert("Please select a date.");
       return;
     }
 
-    if (editingClass && editingClass.id) {
-      const updatedClass = {
-        ...editingClass,
-        student_id: studentId,
-        scheduled_at: scheduledAt
-      };
+    // Convert 12h Clock choices to 24h ISO standard
+    const hourNum = parseInt(hour, 10);
+    const hour24 = period === 'PM'
+      ? (hourNum === 12 ? 12 : hourNum + 12)
+      : (hourNum === 12 ? 0 : hourNum);
+
+    const hhStr = String(hour24).padStart(2, '0');
+    const mmStr = String(minute).padStart(2, '0');
+    const scheduledAt = `${dateOnly}T${hhStr}:${mmStr}:00`;
+
+    if (isEditMode) {
+      const updatedClass = { ...editingClass, student_id: studentId, scheduled_at: scheduledAt };
       dbService.saveClass(updatedClass);
-    } else if (parentClass && parentClass.id) {
+    } else if (isMakeupMode) {
       if (existingMakeupClass) {
         const updatedMakeup = { ...existingMakeupClass, scheduled_at: scheduledAt };
         dbService.saveClass(updatedMakeup);
@@ -83,6 +112,9 @@ export default function ClassFormModal({ isOpen, onClose, parentClass, existingM
     onSave();
     onClose();
   };
+
+  const hours = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+  const minutes = ['00', '15', '30', '45'];
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4 transition-all">
@@ -136,14 +168,82 @@ export default function ClassFormModal({ isOpen, onClose, parentClass, existingM
 
           {/* Date & Time Row */}
           <div>
-            <label className="block text-xs font-bold text-gray-600 dark:text-slate-300 mb-1">Date & Time</label>
+            <label className="block text-xs font-bold text-gray-600 dark:text-slate-300 mb-1">Date</label>
             <input
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
+              type="date"
+              value={dateOnly}
+              onChange={(e) => setDateOnly(e.target.value)}
               className="w-full text-sm border-gray-300 dark:border-slate-600 rounded p-2 border bg-gray-50 dark:bg-slate-700 text-gray-950 dark:text-slate-100 focus:ring-2 focus:ring-slate-500"
               required
             />
+          </div>
+
+          {/* No-Scroll Time Picker Interface */}
+          <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-slate-700">
+            <span className="block text-xs font-bold text-gray-600 dark:text-slate-300">Select Time (Tap Grid)</span>
+
+            {/* Hour Buttons */}
+            <div className="space-y-1">
+              <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-bold">Hour</span>
+              <div className="grid grid-cols-6 gap-1">
+                {hours.map(h => (
+                  <button
+                    key={h}
+                    type="button"
+                    onClick={() => setHour(h)}
+                    className={`py-1 rounded text-xs font-semibold border transition ${hour === h
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow'
+                        : 'bg-gray-50 dark:bg-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-100 border-gray-200 dark:border-slate-600 dark:hover:bg-slate-600  cursor-pointer'
+                      }`}
+                  >
+                    {h}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Minutes & Period Selector */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Minutes Column */}
+              <div className="space-y-1">
+                <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-bold">Minute</span>
+                <div className="grid grid-cols-4 gap-1">
+                  {minutes.map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMinute(m)}
+                      className={`py-1 rounded text-xs font-semibold border transition ${minute === m
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow'
+                          : 'bg-gray-50 dark:bg-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-100 border-gray-200 dark:border-slate-600 dark:hover:bg-slate-600  cursor-pointer'
+                        }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* AM/PM Segment */}
+              <div className="space-y-1">
+                <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-bold">Period</span>
+                <div className="grid grid-cols-2 gap-1">
+                  {['AM', 'PM'].map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPeriod(p)}
+                      className={`py-1.5 rounded text-xs font-bold border transition ${period === p
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow'
+                          : 'bg-gray-50 dark:bg-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-100 border-gray-200 dark:border-slate-600 dark:hover:bg-slate-600 cursor-pointer'
+                        }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Footer Action Buttons */}

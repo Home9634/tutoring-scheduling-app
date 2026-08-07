@@ -5,6 +5,7 @@ import CalendarView from './components/CalendarView';
 import ClassDetailsDrawer from './components/ClassDetailsDrawer';
 import ClassFormModal from './components/ClassFormModal';
 import StudentManager from './components/StudentManager';
+import PendingClassesView from './components/PendingClassesView';
 import { getStatusColorClass, getStatusLabel } from './utils/statusHelpers';
 
 export default function App() {
@@ -35,6 +36,11 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  const activePendingCount = classes
+    .filter(c => c.status === 'Cancelled_Teacher' || c.status === 'Cancelled_Parent')
+    .filter(c => !classes.some(makeup => makeup.linked_to_missed_class_id === c.id))
+    .length;
 
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
@@ -81,31 +87,66 @@ export default function App() {
     setEditingClass(classObj);
     setIsClassModalOpen(true);
   };
-  
+
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-slate-900 text-gray-900 dark:text-slate-100 pb-32 transition-colors duration-200">
       {/* Navbar */}
-      <header className="bg-slate-800 dark:bg-slate-950 text-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold tracking-tight">Tuition Class Tracker</h1>
-          <div className="flex gap-3 items-center">
-            {/* Dark Mode toggle */}
-            <button
+      <header className="bg-slate-800 dark:bg-slate-950 text-white shadow-md sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-3 py-3 sm:px-4 sm:py-4 flex justify-between items-center">
+          {/* Logo - slightly shrunk on mobile to prevent wrapping */}
+          <h1 className="text-base sm:text-xl font-bold tracking-tight truncate mr-2">
+            Class Tracker
+          </h1>
+          
+          <div className="flex gap-1.5 sm:gap-3 items-center">
+            {/* Compact Theme Toggle */}
+            <button 
               onClick={toggleTheme}
               className="p-2 bg-slate-700 hover:bg-slate-600 rounded text-sm transition cursor-pointer"
               title="Toggle Dark Mode"
             >
-              {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+              {theme === 'light' ? '🌙' : '☀️'}
             </button>
-            <button
-              onClick={() => setCurrentView(currentView === 'calendar' ? 'students' : 'calendar')}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm font-semibold transition cursor-pointer"
+
+            {/* View Switchers: Icon-only on mobile, full text on screens >= 640px */}
+            <button 
+              onClick={() => setCurrentView('calendar')}
+              className={`px-3 py-2 rounded text-xs sm:text-sm font-semibold transition flex items-center gap-1 cursor-pointer ${
+                currentView === 'calendar' ? 'bg-indigo-600' : 'bg-slate-700 hover:bg-slate-600'
+              }`}
             >
-              {currentView === 'calendar' ? 'Manage Students' : 'View Calendar'}
+              <span>📅</span>
+              <span className="hidden sm:inline">Calendar</span>
+            </button>
+
+            <button 
+              onClick={() => setCurrentView('pending')}
+              className={`px-3 py-2 rounded text-xs sm:text-sm font-semibold transition flex items-center gap-1 cursor-pointer ${
+                currentView === 'pending' ? 'bg-indigo-600' : 'bg-slate-700 hover:bg-slate-600'
+              }`}
+            >
+              <span>⚠️</span>
+              <span className="hidden sm:inline">Pending</span>
+              {activePendingCount > 0 && (
+                <span className="bg-red-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ml-0.5 cursor-pointer">
+                  {activePendingCount}
+                </span>
+              )}
+            </button>
+
+            <button 
+              onClick={() => setCurrentView('students')}
+              className={`px-3 py-2 rounded text-xs sm:text-sm font-semibold transition flex items-center gap-1 cursor-pointer ${
+                currentView === 'students' ? 'bg-indigo-600' : 'bg-slate-700 hover:bg-slate-600'
+              }`}
+            >
+              <span>👥</span>
+              <span className="hidden sm:inline">Students</span>
             </button>
           </div>
         </div>
       </header>
+
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 mt-8">
@@ -214,10 +255,17 @@ export default function App() {
               />
             </section>
           </div>
-        ) : (
-          <StudentManager
-            students={students}
+        ) : currentView === 'pending' ? (
+          <PendingClassesView 
             classes={classes}
+            students={students}
+            onScheduleMakeup={handleInitiateMakeup}
+            onDeleteClass={handleDeleteClass}
+          />
+        ) : (
+          <StudentManager 
+            students={students} 
+            classes={classes} 
             onRefresh={refreshData}
           />
         )}
